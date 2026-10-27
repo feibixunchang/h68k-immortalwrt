@@ -65,8 +65,10 @@ jobs:
         run: |
           echo 'src-git istore https://github.com/linkease/istore;main' >> feeds.conf.default
           git clone --depth=1 https://github.com/sirpdboy/luci-app-lucky.git /tmp/lucky
-          mkdir -p package/lucky
-          cp -r /tmp/lucky/luci-app-lucky package/lucky/
+          mkdir -p package/lucky/luci-app-lucky package/lucky/lucky
+          cp -r /tmp/lucky/luci-app-lucky/. package/lucky/luci-app-lucky/
+          cp -r /tmp/lucky/lucky/. package/lucky/lucky/
+          ls -la package/lucky/lucky/Makefile package/lucky/luci-app-lucky/Makefile
           rm -rf /tmp/lucky
 
       - name: 更新并安装 feeds
@@ -79,6 +81,9 @@ jobs:
         run: |
           cp ../h68k-custom/config/hinlink_h68k.config .config
           make defconfig
+          echo "::group::.config 关键项调试输出"
+          grep -iE 'hinlink|app-store|dnsmasq|avahi|i18n-base|usb-printer|PACKAGE_lucky' .config || true
+          echo "::endgroup::"
           python3 ../h68k-custom/scripts/validate_config.py
 
       - name: 下载源并预编译工具链
