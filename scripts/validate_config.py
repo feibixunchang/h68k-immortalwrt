@@ -9,7 +9,7 @@ from pathlib import Path
 CFG = Path(".config").read_text(encoding="utf-8", errors="ignore")
 
 REQUIRED = [
-    ("CONFIG_TARGET_DEVICE_rockchip_armv8_DEVICE_hinlink_h68k=y", "H68K 设备支持（patch 未生效？）"),
+    ("CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h68k=y", "H68K 设备支持（patch 未生效？）"),
     ("CONFIG_PACKAGE_luci=y",                               "LuCI 界面"),
     ("CONFIG_PACKAGE_luci-app-openclash=y",                 "OpenClash"),
     ("CONFIG_PACKAGE_tailscale=y",                          "Tailscale 守护进程"),
