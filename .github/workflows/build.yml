@@ -61,28 +61,40 @@ jobs:
       - name: 移植 HINLINK H68K 官方支持到 ImmortalWrt 源码
         run: python3 ../h68k-custom/scripts/patch_hinlink.py .
 
-      - name: 接入第三方插件源 (iStore / Lucky)
+      - name: 接入第三方插件源 (iStore / Lucky) + usblp 内核内置
         run: |
-          echo 'src-git istore https://github.com/linkease/istore;main' >> feeds.conf.default
+          # Lucky：本地包接入（feed 方式在 run1 缺二进制包目录）
           git clone --depth=1 https://github.com/sirpdboy/luci-app-lucky.git /tmp/lucky
           mkdir -p package/lucky/luci-app-lucky package/lucky/lucky
           cp -r /tmp/lucky/luci-app-lucky/. package/lucky/luci-app-lucky/
           cp -r /tmp/lucky/lucky/. package/lucky/lucky/
-          ls -la package/lucky/lucky/Makefile package/lucky/luci-app-lucky/Makefile
           rm -rf /tmp/lucky
+          # iStore：run2 实测 feed 安装后 kconfig 符号不可见，改为与 lucky 相同的本地包方式
+          git clone --depth=1 https://github.com/linkease/istore.git /tmp/istore
+          mkdir -p package/istore
+          cp -r /tmp/istore/luci/. package/istore/
+          rm -rf /tmp/istore
+          ls package/istore/
+          # USB 打印机：kmod-usb-printer 依赖虚拟包 printer-support，master 上符号不可见
+          #   → 直接把 usblp 做成内核内置，等效且更稳
+          if grep -q '^CONFIG_USB_PRINTER' target/linux/rockchip/armv8/config-6.18; then
+            sed -i 's/^CONFIG_USB_PRINTER.*/CONFIG_USB_PRINTER=y/' target/linux/rockchip/armv8/config-6.18
+          else
+            printf 'CONFIG_USB_PRINTER=y\n' >> target/linux/rockchip/armv8/config-6.18
+          fi
+          grep 'USB_PRINTER' target/linux/rockchip/armv8/config-6.18
 
       - name: 更新并安装 feeds
         run: |
           ./scripts/feeds update -a
           ./scripts/feeds install -a
-          ./scripts/feeds install -d y -p istore luci-app-store
 
       - name: 部署定制配置并生成 .config
         run: |
           cp ../h68k-custom/config/hinlink_h68k.config .config
           make defconfig
           echo "::group::.config 关键项调试输出"
-          grep -iE 'hinlink|app-store|dnsmasq|avahi|i18n-base|usb-printer|PACKAGE_lucky' .config || true
+          grep -iE 'hinlink|app-store|taskd|dnsmasq|USB_PRINTER|luci-i18n-base-zh' .config || true
           echo "::endgroup::"
           python3 ../h68k-custom/scripts/validate_config.py
 
