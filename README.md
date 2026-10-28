@@ -118,7 +118,11 @@ ImmortalWrt 源码树（纯注册层移植，不需要任何内核补丁）：
 config/hinlink_h68k.config       # 固件 seed 配置（插件增减处）
 scripts/patch_hinlink.py         # H68K 支持 → ImmortalWrt 移植脚本（锚点自校验）
 scripts/validate_config.py       # 编译前功能完整性校验
+patches/106-board-rockchip-...   # 上游 u-boot H66K/H68K 板级补丁（新建 defconfig/dtsi，必需）
 ```
+
+> 说明：u-boot 发行版**并未**内置 hinlink 板级文件（run5 实证），OpenWrt 官方主线同样
+> 保留该 106 号补丁，故本仓库随源码携带并自动放入 `package/boot/uboot-rockchip/patches/`。
 
 > 本仓库生成物基于 ImmortalWrt master（GPLv2 上游代码汇编），
 > H68K 板级支持版权归 OpenWrt 上游（Chukun Pan, PR openwrt/openwrt#21270）。
