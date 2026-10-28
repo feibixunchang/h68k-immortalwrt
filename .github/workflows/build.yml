@@ -61,42 +61,62 @@ jobs:
       - name: 移植 HINLINK H68K 官方支持到 ImmortalWrt 源码
         run: python3 ../h68k-custom/scripts/patch_hinlink.py .
 
-      - name: 接入第三方插件源 (iStore / Lucky) + usblp 内核内置
+      - name: 接入第三方插件 (iStore / Lucky) + usblp 内核内置
         run: |
-          # Lucky：本地包接入（feed 方式在 run1 缺二进制包目录）
+          # Lucky：本地包接入（run1 缺 lucky 二进制包目录的问题已修，run3 验证 界面+本体 双 ✔）
           git clone --depth=1 https://github.com/sirpdboy/luci-app-lucky.git /tmp/lucky
           mkdir -p package/lucky/luci-app-lucky package/lucky/lucky
           cp -r /tmp/lucky/luci-app-lucky/. package/lucky/luci-app-lucky/
           cp -r /tmp/lucky/lucky/. package/lucky/lucky/
           rm -rf /tmp/lucky
-          # iStore：run2 实测 feed 安装后 kconfig 符号不可见，改为与 lucky 相同的本地包方式
+          # iStore：本地包方式（与 lucky 同款，run3 验证 taskd/luci-lib-taskd 符号可见）
           git clone --depth=1 https://github.com/linkease/istore.git /tmp/istore
           mkdir -p package/istore
           cp -r /tmp/istore/luci/. package/istore/
           rm -rf /tmp/istore
-          ls package/istore/
-          # USB 打印机：kmod-usb-printer 依赖虚拟包 printer-support，master 上符号不可见
-          #   → 直接把 usblp 做成内核内置，等效且更稳
+          # 【run3 定根因】luci-app-store 的 LUCI_EXTRA_DEPENDS 写成 "luci-lib-taskd (>=1.0.19)"，
+          # ImmortalWrt master 的 apk/kconfig 新机制无法表达版本比较 → 整个符号被隐藏（run2 feed
+          # 方式与 run3 本地方式不可见的共同解释；lucky 无版本比较故一直存活）。
+          # 依赖与 taskd 同仓库、版本天然匹配 → 去掉比较符仅保留包名。
+          if [ -f package/istore/luci-app-store/Makefile ]; then
+            sed -i 's/^LUCI_EXTRA_DEPENDS:=luci-lib-taskd.*/LUCI_EXTRA_DEPENDS:=luci-lib-taskd/' package/istore/luci-app-store/Makefile
+            grep '^LUCI_EXTRA_DEPENDS' package/istore/luci-app-store/Makefile
+          fi
+          ls package/istore/ package/lucky/
+          # USB 打印机：kmod-usb-printer 依赖虚拟包 printer-support，master 符号不可见
+          #   → usblp 直接内核内置，等效且更稳
           if grep -q '^CONFIG_USB_PRINTER' target/linux/rockchip/armv8/config-6.18; then
             sed -i 's/^CONFIG_USB_PRINTER.*/CONFIG_USB_PRINTER=y/' target/linux/rockchip/armv8/config-6.18
           else
             printf 'CONFIG_USB_PRINTER=y\n' >> target/linux/rockchip/armv8/config-6.18
           fi
-          grep 'USB_PRINTER' target/linux/rockchip/armv8/config-6.18
 
       - name: 更新并安装 feeds
         run: |
+          # 防呆：feeds 配置完整性检查（上游漂移/误改即快速失败，不带病编译）
+          grep -q '^src-git packages' feeds.conf.default || { echo '[FATAL] feeds.conf.default 缺 src-git packages'; exit 1; }
+          grep -q '^src-git luci' feeds.conf.default || { echo '[FATAL] feeds.conf.default 缺 src-git luci'; exit 1; }
           ./scripts/feeds update -a
           ./scripts/feeds install -a
+          # 关键包可见性盘点（纯日志，不阻断；根因判断以第 9 步 validate 为准）
+          for k in luci-app-openclash tailscale cups dnsmasq-full samba4-server; do
+            ./scripts/feeds list -f 2>/dev/null | grep -q "Name: $k" && echo "[FEED-OK ] $k" || echo "[FEED-MISS] $k"
+          done
+          grep -l 'Package/luci-app-store' package/istore/*/Makefile && echo '[LOCAL-OK] luci-app-store (package/istore)' || echo '[LOCAL-MISS] luci-app-store!!'
 
       - name: 部署定制配置并生成 .config
         run: |
           cp ../h68k-custom/config/hinlink_h68k.config .config
           make defconfig
           echo "::group::.config 关键项调试输出"
-          grep -iE 'hinlink|app-store|taskd|dnsmasq|USB_PRINTER|luci-i18n-base-zh' .config || true
+          grep -iE 'hinlink|app-store|taskd|openclash|dnsmasq|USB_PRINTER|luci-i18n-base-zh' .config || true
           echo "::endgroup::"
-          python3 ../h68k-custom/scripts/validate_config.py
+          python3 ../h68k-custom/scripts/validate_config.py || {
+            echo "::group::.config 诊断 dump（相关行全文）"
+            grep -iE 'openclash|store|taskd|lucky|dnsmasq|tailscale|cups|avahi' .config | head -n 120 || true
+            echo "::endgroup::"
+            exit 1
+          }
 
       - name: 下载源并预编译工具链
         run: |
@@ -166,5 +186,5 @@ jobs:
             echo "### 烧录与默认信息"
             echo "- TF 卡体验：balenaEtcher 直写 .img.gz（保留 eMMC 原厂系统）"
             echo "- 写 eMMC：先用 TF 版验证正常后，再在系统内 dd 到 /dev/mmcblk0（见 README）"
-            echo "- 默认管理地址: http://192.168.1.1  用户: root  密码: 空"
+            echo "- 默认管理地址: http://192.168.1.1  用户: root  密码: 空（登录后请先设密码）"
           } >> "$GITHUB_STEP_SUMMARY"
