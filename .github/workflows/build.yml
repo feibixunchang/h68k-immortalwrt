@@ -98,10 +98,7 @@ jobs:
           grep -q '^src-git luci' feeds.conf.default || { echo '[FATAL] feeds.conf.default 缺 src-git luci'; exit 1; }
           ./scripts/feeds update -a
           ./scripts/feeds install -a
-          # 关键包可见性盘点（纯日志，不阻断；根因判断以第 9 步 validate 为准）
-          for k in luci-app-openclash tailscale cups dnsmasq-full samba4-server; do
-            ./scripts/feeds list -f 2>/dev/null | grep -q "Name: $k" && echo "[FEED-OK ] $k" || echo "[FEED-MISS] $k"
-          done
+          # store 本地包落地确认（可见性最终以第 9 步 validate 为准）
           grep -l 'Package/luci-app-store' package/istore/*/Makefile && echo '[LOCAL-OK] luci-app-store (package/istore)' || echo '[LOCAL-MISS] luci-app-store!!'
 
       - name: 部署定制配置并生成 .config
@@ -114,6 +111,11 @@ jobs:
           python3 ../h68k-custom/scripts/validate_config.py || {
             echo "::group::.config 诊断 dump（相关行全文）"
             grep -iE 'openclash|store|taskd|lucky|dnsmasq|tailscale|cups|avahi' .config | head -n 120 || true
+            echo "::endgroup::"
+            echo "::group::iStore 专项诊断（store 符号是否在 kconfig 索引 / 直接编译是否报错）"
+            grep -n 'app-store' tmp/.config-package.in | head -n 10 || echo '[STORE-HIDDEN] luci-app-store 不在 kconfig 索引中'
+            make package/istore/luci-app-store/{clean,compile} -j1 V=sc > store-diag.log 2>&1; echo "make exit=$?"
+            tail -n 40 store-diag.log || true
             echo "::endgroup::"
             exit 1
           }
