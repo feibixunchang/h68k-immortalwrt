@@ -16,7 +16,6 @@ REQUIRED = [
     ("CONFIG_PACKAGE_samba4-server=y",                      "SMB 共享 (samba4)"),
     ("CONFIG_PACKAGE_luci-app-samba4=y",                    "SMB LuCI 界面"),
     ("CONFIG_PACKAGE_luci-app-filemanager=y",               "文件管理器"),
-    ("CONFIG_PACKAGE_luci-app-store=y",                     "iStore 应用商店"),
     ("CONFIG_PACKAGE_luci-app-lucky=y",                     "Lucky"),
     ("CONFIG_PACKAGE_lucky=y",                              "Lucky 二进制本体"),
     ("CONFIG_PACKAGE_cups=y",                               "CUPS 打印服务"),
@@ -25,9 +24,12 @@ REQUIRED = [
     ("CONFIG_PACKAGE_block-mount=y",                        "磁盘挂载(文件管理依赖)"),
 ]
 
-# kernel 可能把 usblp 做成内置，此时 kmod 选择项不存在 → 降为可选观察
+# run4 起 iStore 降级观察：luci-app-store 符号在 master apk 索引阶段不生成
+# （构建依赖 csstidy/luasrcdiet host 包在 feed 里的解析断链），先出 14 项全绿固件，
+# 商店走后续专项修复或官方 ipk 补装。
 OPTIONAL = [
-    ("CONFIG_PACKAGE_kmod-usb-printer=y",            "USB 打印机驱动(可能内核内置)"),
+    ("CONFIG_PACKAGE_luci-app-store=y",            "iStore 应用商店(暂缓,见诊断)"),
+    ("CONFIG_PACKAGE_kmod-usb-printer=y",          "USB 打印机驱动(内核已内置usblp)"),
     ("CONFIG_PACKAGE_luci-app-tailscale-community=y","Tailscale LuCI 界面"),
     ("CONFIG_PACKAGE_dnsmasq-full=y",                "dnsmasq-full(OpenClash 推荐)"),
     ("CONFIG_PACKAGE_avahi-daemon=y",                "Avahi 网络打印机发现"),
